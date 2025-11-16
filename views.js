@@ -29,16 +29,31 @@ router.get("/categories", odooAuth, async (req, res) => {
                 "product.public.category",
                 "search_read",
                 [[]],
-                { fields: ["id", "name", "parent_id", "sequence"] }
+                { 
+                    fields: ["id", "name", "parent_id", "sequence", "image_256"] 
+                }
             ]
         });
-        const categoriesWithImages = categories.map(cat => ({
-            ...cat,
-            image: `${BASE}/web/image/product.public.category/${cat.id}/image_256`
-        }));
+        const categoriesWithImages = categories.map(cat => {
+            const hasImage = cat.image_256 && typeof cat.image_256 === 'string';
+            const imageUrl = hasImage
+                ? `${BASE}/web/image/product.public.category/${cat.id}/image_256`
+                : "";
+            return {
+                id: cat.id,
+                name: cat.name,
+                parent_id: cat.parent_id,
+                sequence: cat.sequence,
+                image: imageUrl 
+            };
+        });
         res.json(categoriesWithImages);
     } catch (err) {
-        res.status(500).json({ error: err });
+        console.error("Error in /categories middleware:", err);
+        res.status(500).json({ 
+            error: "Failed to fetch categories from Odoo.", 
+            details: err.message || "Unknown error" 
+        });
     }
 });
 
@@ -67,7 +82,8 @@ router.get("/products", odooAuth, async (req, res) => {
                         "list_price",
                         "description_ecommerce",
                         "public_categ_ids",
-                        "website_published"
+                        "website_published",
+                        "image_256"
                     ]
                 }
             ]
@@ -75,10 +91,18 @@ router.get("/products", odooAuth, async (req, res) => {
         const productsWithImages = products.map(p => {
             let plainDescription = decode(p.description_ecommerce || "");
             plainDescription = plainDescription.replace(/<[^>]*>/g, "");
+            const hasImage = p.image_256 && typeof p.image_256 === 'string';
+            const imageUrl = hasImage
+                ? `${BASE}/web/image/product.template/${p.id}/image_256`
+                : "";
             return {
-                ...p,
+                id: p.id,
+                name: p.name,
+                list_price: p.list_price,
                 description_ecommerce: plainDescription,
-                image_url: `${BASE}/web/image/product.template/${p.id}/image_256`
+                public_categ_ids: p.public_categ_ids,
+                website_published: p.website_published,
+                image_url: imageUrl
             };
         });
         res.json(productsWithImages);
@@ -110,7 +134,8 @@ router.get("/product/:id", odooAuth, async (req, res) => {
                         "public_categ_ids",
                         "website_published",
                         "optional_product_ids",
-                        "product_template_image_ids"
+                        "product_template_image_ids",
+                        "image_512"
                     ]
                 }
             ]
@@ -152,7 +177,12 @@ router.get("/product/:id", odooAuth, async (req, res) => {
                 `${BASE}/web/image/product.image/${img.id}/image_512`
             );
         } else {
-            images = [`${BASE}/web/image/product.template/${productId}/image_512`];
+            const hasMainImage = prod.image_512 && typeof prod.image_512 === 'string';
+            if (hasMainImage) {
+                images = [`${BASE}/web/image/product.template/${productId}/image_512`];
+            } else {
+                images = [];
+            }
         }
         let description = decode(prod.description_ecommerce || "");
         description = description.replace(/<[^>]*>/g, "");
@@ -160,7 +190,7 @@ router.get("/product/:id", odooAuth, async (req, res) => {
             ...prod,
             description_ecommerce: description,
             images,
-            categories 
+            categories
         };
         res.json(productWithImages);
     } catch (err) {
