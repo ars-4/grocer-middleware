@@ -5,6 +5,18 @@ const { odooAuth } = require("./middleware");
 const router = express.Router();
 
 
+router.get("/", odooAuth, async (req, res) => {
+    try {
+        res.json({
+            "msg": "Your Credentials Worked"
+        }).status(200);
+    } catch(e) {
+        res.status(400).json({
+            "msg": "Your credentials won't work"
+        })
+    }
+})
+
 router.get("/categories", odooAuth, async (req, res) => {
     try {
         const { uid, DB, PASSWORD } = req.odoo;
