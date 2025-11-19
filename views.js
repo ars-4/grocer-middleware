@@ -1,7 +1,8 @@
 const express = require("express");
 const { decode } = require("html-entities");
-const { login, jsonRPC } = require("./odoo");
+const { jsonRPC } = require("./odoo");
 const { odooAuth } = require("./middleware");
+const { sendEmailOtp, verifyEmailOtp } = require("./passcode");
 const router = express.Router();
 
 
@@ -10,7 +11,7 @@ router.get("/", odooAuth, async (req, res) => {
         res.json({
             "msg": "Your Credentials Worked"
         }).status(200);
-    } catch(e) {
+    } catch (e) {
         res.status(400).json({
             "msg": "Your credentials won't work"
         })
@@ -29,8 +30,8 @@ router.get("/categories", odooAuth, async (req, res) => {
                 "product.public.category",
                 "search_read",
                 [[]],
-                { 
-                    fields: ["id", "name", "parent_id", "sequence", "image_256"] 
+                {
+                    fields: ["id", "name", "parent_id", "sequence", "image_256"]
                 }
             ]
         });
@@ -44,15 +45,15 @@ router.get("/categories", odooAuth, async (req, res) => {
                 name: cat.name,
                 parent_id: cat.parent_id,
                 sequence: cat.sequence,
-                image: imageUrl 
+                image: imageUrl
             };
         });
         res.json(categoriesWithImages);
     } catch (err) {
         console.error("Error in /categories middleware:", err);
-        res.status(500).json({ 
-            error: "Failed to fetch categories from Odoo.", 
-            details: err.message || "Unknown error" 
+        res.status(500).json({
+            error: "Failed to fetch categories from Odoo.",
+            details: err.message || "Unknown error"
         });
     }
 });
@@ -83,11 +84,40 @@ router.get("/products", odooAuth, async (req, res) => {
                         "description_ecommerce",
                         "public_categ_ids",
                         "website_published",
-                        "image_256"
+                        "image_256",
+                        "website_ribbon_id"
                     ]
                 }
             ]
         });
+        const ribbonIds = [...new Set(
+            products
+                .map(p => p.website_ribbon_id ? p.website_ribbon_id[0] : null)
+                .filter(id => id !== null)
+        )];
+        let ribbonDetails = {};
+        if (ribbonIds.length > 0) {
+            const ribbons = await jsonRPC({
+                service: "object",
+                method: "execute_kw",
+                args: [
+                    DB, uid, PASSWORD,
+                    "product.ribbon",
+                    "read",
+                    [ribbonIds],
+                    {
+                        fields: ["display_name", "bg_color", "text_color"]
+                    }
+                ]
+            });
+            ribbons.forEach(ribbon => {
+                ribbonDetails[ribbon.id] = {
+                    name: ribbon.display_name,
+                    bg_color: ribbon.bg_color || "#f44336",
+                    text_color: ribbon.text_color || "#fff",
+                };
+            });
+        }
         const productsWithImages = products.map(p => {
             let plainDescription = decode(p.description_ecommerce || "");
             plainDescription = plainDescription.replace(/<[^>]*>/g, "");
@@ -95,6 +125,18 @@ router.get("/products", odooAuth, async (req, res) => {
             const imageUrl = hasImage
                 ? `${BASE}/web/image/product.template/${p.id}/image_256`
                 : "";
+            let ribbonName = null;
+            let ribbonBgColor = null;
+            let ribbonTextColor = null;
+            if (p.website_ribbon_id && p.website_ribbon_id.length > 0) {
+                const ribbonId = p.website_ribbon_id[0];
+                const details = ribbonDetails[ribbonId];
+                if (details) {
+                    ribbonName = details.name;
+                    ribbonBgColor = details.bg_color.replace("#", "0xFF");
+                    ribbonTextColor = details.text_color.replace("#", "0xFF");
+                }
+            }
             return {
                 id: p.id,
                 name: p.name,
@@ -102,7 +144,10 @@ router.get("/products", odooAuth, async (req, res) => {
                 description_ecommerce: plainDescription,
                 public_categ_ids: p.public_categ_ids,
                 website_published: p.website_published,
-                image_url: imageUrl
+                image_url: imageUrl,
+                ribbon_name: ribbonName,
+                ribbon_bg_color: ribbonBgColor,
+                ribbon_text_color: ribbonTextColor
             };
         });
         res.json(productsWithImages);
@@ -135,7 +180,7 @@ router.get("/product/:id", odooAuth, async (req, res) => {
                         "website_published",
                         "optional_product_ids",
                         "product_template_image_ids",
-                        "image_512"
+                        "website_ribbon_id"
                     ]
                 }
             ]
@@ -186,11 +231,43 @@ router.get("/product/:id", odooAuth, async (req, res) => {
         }
         let description = decode(prod.description_ecommerce || "");
         description = description.replace(/<[^>]*>/g, "");
+        const ribbonTuple = prod.website_ribbon_id;
+        let ribbonDetails = {
+            name: null,
+            bg_color: null,
+            text_color: null
+        };
+        if (ribbonTuple && ribbonTuple.length > 0) {
+            const ribbonId = ribbonTuple[0];
+            const ribbonRecords = await jsonRPC({
+                service: "object",
+                method: "execute_kw",
+                args: [
+                    DB, uid, PASSWORD,
+                    "product.ribbon",
+                    "read",
+                    [[ribbonId]],
+                    {
+                        fields: ["display_name", "bg_color", "text_color"]
+                    }
+                ]
+            });
+            if (ribbonRecords.length > 0) {
+                const ribbonData = ribbonRecords[0];
+                ribbonDetails.name = ribbonData.display_name;
+                ribbonDetails.bg_color = ribbonData.bg_color ? ribbonData.bg_color.replace("#", "0xFF") : null;
+                ribbonDetails.text_color = ribbonData.text_color ? ribbonData.text_color.replace("#", "0xFF") : null;
+            }
+        }
         const productWithImages = {
             ...prod,
             description_ecommerce: description,
+            image_512: images[0],
             images,
-            categories
+            categories,
+            ribbon_name: ribbonDetails.name,
+            ribbon_bg_color: ribbonDetails.bg_color,
+            ribbon_text_color: ribbonDetails.text_color
         };
         res.json(productWithImages);
     } catch (err) {
@@ -300,30 +377,7 @@ router.post("/create-order", odooAuth, async (req, res) => {
         res.status(500).json({ error: err });
     }
 });
-/*
-{
-  "customer_id": 10,
-  "products": [
-    {
-      "id": 8,
-      "qty": 2
-    },
-    {
-      "id": 2,
-      "qty": 1
-    },
-    {
-      "id": 7,
-      "qty": 4
-    }
-  ]
-}
-  */
 
-
-// ---------------------------------------------------------
-// 5. Single Order with lines
-// ---------------------------------------------------------
 router.get("/order/:id", odooAuth, async (req, res) => {
     try {
         const { uid, DB, PASSWORD } = req.odoo;
@@ -390,14 +444,13 @@ router.get("/order/:id", odooAuth, async (req, res) => {
 
 router.post("/customer/login", odooAuth, async (req, res) => {
     try {
-        const { name, phone } = req.body;
-        if (!name && !phone) {
-            return res.status(400).json({ error: "Name or phone is required" });
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ error: "Email is required" });
         }
         const { uid, DB, PASSWORD } = req.odoo;
         let domain = [];
-        if (name) domain.push(["name", "ilike", name]);
-        if (phone) domain.push(["phone", "=", phone]);
+        if (email) domain.push(["email", "=", email]);
         const partners = await jsonRPC({
             service: "object",
             method: "execute_kw",
@@ -412,23 +465,55 @@ router.post("/customer/login", odooAuth, async (req, res) => {
         if (!partners || partners.length === 0) {
             return res.status(404).json({ error: "Customer not found" });
         }
+        const otpSent = await sendEmailOtp(email)
         res.json(partners[0]);
-
     } catch (err) {
         res.status(500).json({ error: err });
     }
 });
-/*
-{
-  "name": "John Doe",
-  "phone": "+923054307983"
-}
-*/
+
+router.post("/auth", odooAuth, async (req, res) => {
+    const { email, otp } = req.body;
+    const { uid, DB, PASSWORD } = req.odoo;
+    if (!email || !otp) {
+        return res.status(400).json({ error: "Email and OTP are required" });
+    }
+    try {
+        const isValid = await verifyEmailOtp(email, otp); 
+
+        if (isValid) {
+            const domain = [["email", "=", email]];
+            const partners = await jsonRPC({
+                service: "object",
+                method: "execute_kw",
+                args: [
+                    DB, uid, PASSWORD,
+                    "res.partner",
+                    "search_read",
+                    [domain],
+                    { fields: ["id", "name", "email", "phone"] }
+                ]
+            });
+            if (!partners || partners.length === 0) {
+                return res.status(404).json({ error: "Customer not found in Odoo." });
+            }
+            return res.status(200).json(partners[0]); 
+        } else {
+            return res.status(401).json({
+                "error": "Invalid OTP, Authentication Error"
+            });
+        }
+    } catch (e) {
+        return res.status(500).json({
+            "error": String(e)
+        });
+    }
+});
 
 
 router.post("/customer/signup", odooAuth, async (req, res) => {
     try {
-        const { name, phone, email, street, street2, city, state_id, zip, country_id } = req.body;
+        const { name, phone, email, street, street2, city, zip } = req.body;
         if (!name || !phone || !email || !street) {
             return res.status(400).json({ error: "Name, phone, email, and street are required" });
         }
@@ -469,9 +554,9 @@ router.post("/customer/signup", odooAuth, async (req, res) => {
                     street,
                     street2: street2 || "",
                     city: city || "",
-                    state_id: state_id || false,
+                    state_id: 1,
                     zip: zip || "",
-                    country_id: country_id || false
+                    country_id: 1
                 }]
             ]
         });
@@ -491,20 +576,6 @@ router.post("/customer/signup", odooAuth, async (req, res) => {
         res.status(500).json({ error: err });
     }
 });
-/**
- {
-  "name": "John Doe",
-  "phone": "+923054307983",
-  "email": "john@example.com",
-  "street": "123 Main Street",
-  "street2": "Apartment 4B",
-  "city": "Lahore",
-  "state_id": 5,
-  "zip": "54000",
-  "country_id": 1
-}
- */
-
 
 
 module.exports = router;

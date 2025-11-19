@@ -1,9 +1,13 @@
 {
   "dependencies": {
+    "@upstash/redis": "^1.35.6",
     "axios": "^1.13.2",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "html-entities": "^2.6.0"
+    "html-entities": "^2.6.0",
+    "nodemailer": "^7.0.10",
+    "otp-generator": "^4.0.1"
   },
   "name": "grocer-middleware",
   "version": "1.0.0",

@@ -16,6 +16,18 @@ All requests require Odoo DB credentials via **query parameters**:
 http://<your-server>/<route>
 ```
 
+.env file Using => Nodemailer and Upstash.com
+
+```bat
+REDIS_URL="https://...."
+REDIS_TOKEN="AZkV........." 
+
+EMAIL_USER="Email"
+EMAIL_PASS="email password"
+
+JWT_SECRET="....."
+```
+
 ---
 
 ## Routes
@@ -72,6 +84,9 @@ http://<your-server>/<route>
     "description_ecommerce": "Naturally whole wheat flour...",
     "website_published": true,
     "categories": ["Flour", "Organic"],
+    "ribbon_name": "New!",
+    "ribbon_bg_color": "0xFFd9026a",
+    "ribbon_text_color": "0xFFFFFFFF",
     "images": [
       "https://mydb.odoo.com/web/image/product.template/3/image_256"
     ]
@@ -102,6 +117,9 @@ http://<your-server>/<route>
   "description_ecommerce": "Naturally whole wheat flour...",
   "website_published": true,
   "categories": ["Flour", "Organic"],
+  "ribbon_name": "New!",
+  "ribbon_bg_color": "0xFFd9026a",
+  "ribbon_text_color": "0xFFFFFFFF",
   "images": [
     "https://mydb.odoo.com/web/image/product.template/3/image_512",
     "https://mydb.odoo.com/web/image/product.image/12/image_512"
@@ -168,8 +186,30 @@ http://<your-server>/<route>
 
 ```json
 {
-  "name": "John Doe",
-  "phone": "+923054307983"
+  "email": "john_doe@example.com"
+}
+```
+
+**Response:**
+
+```json
+{
+  "msg": "OTP Sent",
+}
+```
+
+### 5. Customer OTP
+
+**URL:** `/auth`  
+**Method:** `POST`
+
+**Query Parameters:** Odoo DB credentials as before.
+
+**Request Body:**
+
+```json
+{
+  "email": "john_doe@example.com"
 }
 ```
 
@@ -184,6 +224,7 @@ http://<your-server>/<route>
   "street": "123 Main Street"
 }
 ```
+
 
 ### 6. Create Order
 
