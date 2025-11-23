@@ -1,6 +1,6 @@
 const express = require("express");
 const { decode } = require("html-entities");
-const { jsonRPC } = require("./odoo");
+const { jsonRPC, getExternalId } = require("./odoo");
 const { odooAuth } = require("./middleware");
 const { sendEmailOtp, verifyEmailOtp } = require("./passcode");
 const router = express.Router();
@@ -479,7 +479,7 @@ router.post("/auth", odooAuth, async (req, res) => {
         return res.status(400).json({ error: "Email and OTP are required" });
     }
     try {
-        const isValid = await verifyEmailOtp(email, otp); 
+        const isValid = await verifyEmailOtp(email, otp);
 
         if (isValid) {
             const domain = [["email", "=", email]];
@@ -497,7 +497,7 @@ router.post("/auth", odooAuth, async (req, res) => {
             if (!partners || partners.length === 0) {
                 return res.status(404).json({ error: "Customer not found in Odoo." });
             }
-            return res.status(200).json(partners[0]); 
+            return res.status(200).json(partners[0]);
         } else {
             return res.status(401).json({
                 "error": "Invalid OTP, Authentication Error"
@@ -556,27 +556,40 @@ router.post("/customer/signup", odooAuth, async (req, res) => {
                     city: city || "",
                     state_id: 1,
                     zip: zip || "",
-                    country_id: 1
+                    country_id: 586
                 }]
             ]
         });
         try {
+            const portalGroupId = await getExternalId('base.group_portal', DB, uid, PASSWORD);
             await jsonRPC({
                 service: "object",
                 method: "execute_kw",
                 args: [
                     DB, uid, PASSWORD,
-                    "portal.wizard", 
-                    "create_users", 
+                    "res.partner", 
+                    "write",
                     [
                         [partnerId], 
-                        { 'password': password } 
-                    ]
+                        {
+                            "user_ids": [
+                                [0, 0, {
+                                    "login": email,
+                                    "password": password,
+                                    "group_ids": [[6, 0, [portalGroupId]]]
+                                }]
+                            ]
+                        }
+                    ],
+                    {
+                        "context": {
+                            "no_reset_password": true
+                        }
+                    }
                 ]
             });
         } catch (portalErr) {
-            console.error("Failed to create portal user:", portalErr);
-            return res.status(500).json({ error: "Customer created, but failed to grant website login access." });
+            return res.status(500).json({ error: "Customer created, but failed to grant website login access. Please try again." });
         }
         const partner = await jsonRPC({
             service: "object",

@@ -24,8 +24,26 @@ async function login(DB, USER, PASSWORD) {
     });
 }
 
+async function getExternalId(externalId, DB, uid, PASSWORD) {
+    const data = await jsonRPC({
+        service: "object",
+        method: "execute_kw",
+        args: [
+            DB, uid, PASSWORD,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", externalId.split(".")[0]], ["name", "=", externalId.split(".")[1]]]],
+            { fields: ["res_id"] }
+        ]
+    });
+    if (data && data.length > 0) {
+        return data[0].res_id;
+    }
+    throw new Error(`External ID ${externalId} not found in Odoo.`);
+}
 
 module.exports = {
     jsonRPC,
-    login
+    login,
+    getExternalId
 }
