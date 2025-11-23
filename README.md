@@ -141,6 +141,7 @@ JWT_SECRET="....."
   "name": "John Doe",
   "phone": "+923054307983",
   "email": "john@example.com",
+  "password": "john@example.com",
   "street": "123 Main Street",
   "street2": "Apartment 4B",
   "city": "Lahore",
@@ -194,7 +195,11 @@ JWT_SECRET="....."
 
 ```json
 {
-  "msg": "OTP Sent",
+  "id": 10,
+  "name": "John Doe",
+  "phone": "+923054307983",
+  "email": "john@example.com",
+  "street": "123 Main Street"
 }
 ```
 

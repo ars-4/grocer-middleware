@@ -61,7 +61,7 @@ async function sendEmailOtp(email) {
 
                     <tr>
                         <td align="center" style="background-color: #e0e0e0; padding: 40px 20px;">
-                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333;">You have received the following OTP code:<br>With 5 Minutes Expiration</p>
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333;">You have received the following OTP code With 5 Minutes Expiration</p>
                             
                             <table border="0" cellpadding="0" cellspacing="0" style="margin: 20px auto;">
                                 <tr>
@@ -78,7 +78,7 @@ async function sendEmailOtp(email) {
                     <tr>
                         <td align="center" style="background-color: #242424; color: #ffffff; padding: 20px 10px;">
                             <p style="margin: 0; font-size: 10px; line-height: 1.4;">
-                                Please be aware of Phishing and Spam Emails. Do not click links or share OTPs<br>even if someone asks or if it's sent to you accidentally.<br>Copyright Schediazo.com
+                                Please be aware of Phishing and Spam Emails. Do not click links or share OTPs even if someone asks or if it's sent to you accidentally.<br>Copyright Schediazo.com
                             </p>
                         </td>
                     </tr>

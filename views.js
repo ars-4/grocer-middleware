@@ -48,7 +48,7 @@ router.get("/categories", odooAuth, async (req, res) => {
                 image: imageUrl
             };
         });
-        res.json(categoriesWithImages);
+        res.json(categoriesWithImages).status(200);
     } catch (err) {
         console.error("Error in /categories middleware:", err);
         res.status(500).json({
@@ -150,7 +150,7 @@ router.get("/products", odooAuth, async (req, res) => {
                 ribbon_text_color: ribbonTextColor
             };
         });
-        res.json(productsWithImages);
+        res.json(productsWithImages).status(200);
     } catch (err) {
         res.status(500).json({ error: err });
     }
@@ -269,7 +269,7 @@ router.get("/product/:id", odooAuth, async (req, res) => {
             ribbon_bg_color: ribbonDetails.bg_color,
             ribbon_text_color: ribbonDetails.text_color
         };
-        res.json(productWithImages);
+        res.json(productWithImages).status(200);
     } catch (err) {
         res.status(500).json({ error: err });
     }
@@ -306,7 +306,7 @@ router.get("/orders", odooAuth, async (req, res) => {
                 }
             ]
         });
-        res.json(orders);
+        res.json(orders).status(200);
     } catch (err) {
         res.status(500).json({ error: err });
     }
@@ -435,7 +435,7 @@ router.get("/order/:id", odooAuth, async (req, res) => {
             date_order: order.date_order,
             products: products,
             tag_ids: order.tag_ids
-        });
+        }).status(200);
     } catch (err) {
         res.status(500).json({ error: err });
     }
@@ -466,7 +466,7 @@ router.post("/customer/login", odooAuth, async (req, res) => {
             return res.status(404).json({ error: "Customer not found" });
         }
         const otpSent = await sendEmailOtp(email)
-        res.json(partners[0]);
+        res.json(partners[0]).status(200);
     } catch (err) {
         res.status(500).json({ error: err });
     }
@@ -513,9 +513,9 @@ router.post("/auth", odooAuth, async (req, res) => {
 
 router.post("/customer/signup", odooAuth, async (req, res) => {
     try {
-        const { name, phone, email, street, street2, city, zip } = req.body;
+        const { name, phone, email, street, street2, city, zip, password } = req.body;
         if (!name || !phone || !email || !street) {
-            return res.status(400).json({ error: "Name, phone, email, and street are required" });
+            return res.status(400).json({ error: "Name, phone, email, street and password are required" });
         }
         const { uid, DB, PASSWORD } = req.odoo;
         let domain = [];
@@ -560,6 +560,24 @@ router.post("/customer/signup", odooAuth, async (req, res) => {
                 }]
             ]
         });
+        try {
+            await jsonRPC({
+                service: "object",
+                method: "execute_kw",
+                args: [
+                    DB, uid, PASSWORD,
+                    "portal.wizard", 
+                    "create_users", 
+                    [
+                        [partnerId], 
+                        { 'password': password } 
+                    ]
+                ]
+            });
+        } catch (portalErr) {
+            console.error("Failed to create portal user:", portalErr);
+            return res.status(500).json({ error: "Customer created, but failed to grant website login access." });
+        }
         const partner = await jsonRPC({
             service: "object",
             method: "execute_kw",
