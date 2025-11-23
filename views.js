@@ -513,7 +513,7 @@ router.post("/auth", odooAuth, async (req, res) => {
 
 router.post("/customer/signup", odooAuth, async (req, res) => {
     try {
-        const { name, phone, email, street, street2, city, zip, password } = req.body;
+        const { name, phone, email, street, street2, city, zip, password, country_id } = req.body;
         if (!name || !phone || !email || !street) {
             return res.status(400).json({ error: "Name, phone, email, street and password are required" });
         }
@@ -556,7 +556,7 @@ router.post("/customer/signup", odooAuth, async (req, res) => {
                     city: city || "",
                     state_id: 1,
                     zip: zip || "",
-                    country_id: 586
+                    country_id: Number(country_id)
                 }]
             ]
         });
