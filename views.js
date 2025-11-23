@@ -491,7 +491,7 @@ router.post("/auth", odooAuth, async (req, res) => {
                     "res.partner",
                     "search_read",
                     [domain],
-                    { fields: ["id", "name", "email", "phone"] }
+                    { fields: ["id", "name", "email", "phone", "street", "city"] }
                 ]
             });
             if (!partners || partners.length === 0) {
